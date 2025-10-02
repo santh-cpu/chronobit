@@ -1,5 +1,9 @@
+#include <WiFi.h>
+#include <WebServer.h>
 #include <FastLED.h>
+#include "Arduino.h"
 #include "font.h"
+#include "./modules/timeFunctions.c"
 
 #define DATA_PIN   12 
 #define LED_TYPE    WS2812B
@@ -11,6 +15,58 @@
 #define NUM_LEDS (IMAGE_WIDTH * IMAGE_HEIGHT)
 
 CRGB leds[NUM_LEDS];
+
+
+const char* ssid     = "THINDIPARAMBATH";         // change this
+const char* password = "9447199935@V";     // change this
+
+WebServer server(80);
+
+void flashColor(CRGB color, int flashes = 3, int delayMs = 300) {
+  for (int i = 0; i < flashes; i++) {
+    fill_solid(leds, NUM_LEDS, color);
+    FastLED.show();
+    delay(delayMs);
+    FastLED.clear();
+    delay(delayMs);
+  }
+}
+
+void showNotification(String msg) {
+  
+  msg.toLowerCase();
+  if (msg == "call") {
+    flashColor(CRGB::Red, 5, 200);  // Flash red for call
+  }
+  else if (msg == "msg") {
+    flashColor(CRGB::Green, 3, 250); // Flash green for message
+  }
+  else if (msg == "alarm") {
+    flashColor(CRGB::Blue, 5, 150);  // Flash blue for alarm
+  }
+  else {
+    flashColor(CRGB::Purple, 2, 400); // Unknown -> purple
+  }
+}
+
+void handleNotify() {
+  if (server.hasArg("msg")) {
+    String message = server.arg("msg");
+    Serial.println("Notification received: " + message);
+    showNotification(message);
+    server.send(200, "text/plain", "OK: " + message);
+  } else {
+    server.send(400, "text/plain", "Missing msg parameter. Use /notify?msg=call");
+  }
+}
+
+void handleRoot() {
+  server.send(200, "text/html",
+              "<h2>ESP32 Notification Server</h2>"
+              "<p>Use <b>/notify?msg=call</b>, <b>msg</b>, or <b>alarm</b></p>");
+}
+
+
 
 int XY2Index(int x,int y){
   return (7-y)+(8*x);
@@ -63,21 +119,29 @@ void setup() {
   Serial.begin(9600);
   FastLED.addLeds<LED_TYPE, DATA_PIN, COLOR_ORDER>(leds, NUM_LEDS);
   FastLED.setBrightness(20);
- }
+  WiFi.begin(ssid, password);
+  Serial.print("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nWiFi connected!");
+  Serial.print("IP Address: ");
+  Serial.println(WiFi.localIP());
+  server.on("/",handleRoot);
+  server.on("/notify",handleNotify);
+  server.begin();
+  Serial.println("\nWeb Server Started! \n");
+  setTime();
+  }
 int iter = 0;
 void loop() {
-  if (iter > 9)
-    iter =0;
-  if(iter %2 == 0 ){
-    displayTime(11,20,CRGB::Blue, CRGB::Green);
- }
-  else{
-    displayTime(11,20,CRGB::Green, CRGB::Blue);
-  }
+  unsigned int* time = getTime();
+  server.handleClient();
+  displayTime(time[0],time[1],CRGB::Blue, CRGB::Green);
   FastLED.show();
   delay(500);
   FastLED.clear();
-  iter ++;
   // Nothing to do here for a static image
 }
 
