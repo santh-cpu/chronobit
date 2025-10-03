@@ -35,7 +35,6 @@ enum ChronoBitModes {
   STOPWATCH,
 };
 enum ChronoBitModes mode = CLOCK;
-extern enum ChronoBitNotificationModes notifMode;
 
 const unsigned int stopWatchResistanceTime = 5000;
 const unsigned int timerResistanceTime = 500;
