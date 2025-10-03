@@ -1,17 +1,19 @@
-// this code has been tested in wowki and works
-// idk how you use platform io sry
+#include <stdlib.h>
+#include "Arduino.h"
+#include <HardwareSerial.h>
+
 
 unsigned long prev = 0;
 unsigned long elapsed = 0;
 
-void setup() {
-  Serial.begin(9600);
 
+
+
+void setTime() {
   Serial.println("enter time hh:mm:ss format:");
   while (Serial.available() == 0) {
   }
   String line = Serial.readStringUntil('\n');
-
   unsigned int h, m, s;
   if (sscanf(line.c_str(), "%u:%u:%u", &h, &m, &s) == 3) {
     elapsed = h * 3600UL + m * 60UL + s;
@@ -22,9 +24,9 @@ void setup() {
   }
 }
 
-void loop() {
+unsigned int* getTime() {
   unsigned long curr = millis();
-
+  unsigned int* time = (unsigned int * )malloc(sizeof(unsigned int)*2);
   if (curr - prev >= 1000) {
     prev += 1000;
     elapsed++;
@@ -33,8 +35,9 @@ void loop() {
     unsigned int minutes = (elapsed / 60) % 60;
     unsigned int seconds = elapsed % 60;
 
-    char buffer[9];
-    sprintf(buffer, "%02u:%02u:%02u", hours, minutes, seconds);
-    Serial.println(buffer);
+    time[0]= hours;
+    time[1]= minutes;
+    return time;
   }
+  return time;
 }

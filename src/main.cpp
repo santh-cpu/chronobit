@@ -1,9 +1,9 @@
 #include <WiFi.h>
 #include <WebServer.h>
 #include <FastLED.h>
-#include "Arduino.h"
+#include "notification.cpp"
 #include "font.h"
-#include "./modules/timeFunctions.c"
+#include "math.h"
 
 #define DATA_PIN   12 
 #define LED_TYPE    WS2812B
@@ -17,48 +17,30 @@
 CRGB leds[NUM_LEDS];
 
 
-const char* ssid     = "THINDIPARAMBATH";         // change this
-const char* password = "9447199935@V";     // change this
+const char* ssid     = "SamsungA22";
+const char* password = "passwrdhehe";
 
 WebServer server(80);
 
-void flashColor(CRGB color, int flashes = 3, int delayMs = 300) {
-  for (int i = 0; i < flashes; i++) {
-    fill_solid(leds, NUM_LEDS, color);
-    FastLED.show();
-    delay(delayMs);
-    FastLED.clear();
-    delay(delayMs);
-  }
+
+int XY2Index(int x,int y){
+  return (7-y)+(8*x);
 }
 
-void showNotification(String msg) {
-  
-  msg.toLowerCase();
-  if (msg == "call") {
-    flashColor(CRGB::Red, 5, 200);  // Flash red for call
-  }
-  else if (msg == "msg") {
-    flashColor(CRGB::Green, 3, 250); // Flash green for message
-  }
-  else if (msg == "alarm") {
-    flashColor(CRGB::Blue, 5, 150);  // Flash blue for alarm
-  }
-  else {
-    flashColor(CRGB::Purple, 2, 400); // Unknown -> purple
-  }
-}
 
 void handleNotify() {
   if (server.hasArg("msg")) {
     String message = server.arg("msg");
     Serial.println("Notification received: " + message);
-    showNotification(message);
+    showNotification(message,leds);
     server.send(200, "text/plain", "OK: " + message);
   } else {
     server.send(400, "text/plain", "Missing msg parameter. Use /notify?msg=call");
   }
 }
+
+
+
 
 void handleRoot() {
   server.send(200, "text/html",
@@ -66,11 +48,6 @@ void handleRoot() {
               "<p>Use <b>/notify?msg=call</b>, <b>msg</b>, or <b>alarm</b></p>");
 }
 
-
-
-int XY2Index(int x,int y){
-  return (7-y)+(8*x);
-}
 
 void drawNum(int num, int start_x,int start_y,CRGB color){
   if (num > 9 || num < 0)
@@ -132,16 +109,15 @@ void setup() {
   server.on("/notify",handleNotify);
   server.begin();
   Serial.println("\nWeb Server Started! \n");
-  setTime();
-  }
+}
+
 int iter = 0;
 void loop() {
-  unsigned int* time = getTime();
+  unsigned int time[] = {0,0};
   server.handleClient();
   displayTime(time[0],time[1],CRGB::Blue, CRGB::Green);
   FastLED.show();
   delay(500);
   FastLED.clear();
-  // Nothing to do here for a static image
 }
 
