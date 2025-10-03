@@ -1,3 +1,8 @@
+/*
+* Use: Using an external NTP server to sync the device's time 
+* Author: Srisanth Arulkumar
+*/
+
 #include <WiFi.h>
 #include <WebServer.h>
 #include <FastLED.h>

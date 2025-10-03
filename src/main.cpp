@@ -1,49 +1,66 @@
-#include <WiFi.h>
-#include <WebServer.h>
+/*
+Use: The main file of the project
+Authors: Visruth Thayyil Vijind,Sharmin A S, Vibin Ragav, Srisanth Arulkumar
+*/
+
+#include <math.h>
 #include <FastLED.h>
+#include <WebServer.h>
+#include <WiFi.h>
 #include <time.h>
+#include "font.h"
 #include "notification.cpp"
 #include "timeFunctions.cpp"
-#include "font.h"
-#include "math.h"
 
-#define DATA_PIN   12 
-#define LED_TYPE    WS2812B
+
+// Setting up led pins
+#define DATA_PIN 12
+#define LED_TYPE WS2812B
 #define COLOR_ORDER GRB
-#define BRIGHTNESS  50
-
+#define BRIGHTNESS 50
 #define IMAGE_WIDTH 16
 #define IMAGE_HEIGHT 8
 #define NUM_LEDS (IMAGE_WIDTH * IMAGE_HEIGHT)
-
 CRGB leds[NUM_LEDS];
 
-
-const char* ssid     = "SamsungA22";
-const char* password = "passwrdhehe";
 extern unsigned long lastTimeSync;
 
 WebServer server(80);
+const char *ssid = "SamsungA22";
+const char *password = "passwrdhehe";
 
+enum ChronoBitModes {
+  CLOCK,
+  TIMER,
+  STOPWATCH,
+};
+enum ChronoBitModes mode = CLOCK;
+extern enum ChronoBitNotificationModes notifMode;
 
-int XY2Index(int x,int y){
-  return (7-y)+(8*x);
-}
+const unsigned int stopWatchResistanceTime = 5000;
+const unsigned int timerResistanceTime = 500;
 
+void displayTime(int hour, int minute, CRGB hourColor, CRGB minuteColor);
+void displayStopWatch();
+void displayTimer();
 
+// handle notification
 void handleNotify() {
   if (server.hasArg("msg")) {
     String message = server.arg("msg");
     Serial.println("Notification received: " + message);
-    showNotification(message,leds);
+    showNotification(message, leds);
     server.send(200, "text/plain", "OK: " + message);
   } else {
-    server.send(400, "text/plain", "Missing msg parameter. Use /notify?msg=call");
+    server.send(400, "text/plain",
+                "Missing msg parameter. Use /notify?msg=call");
   }
 }
 
+// the root webpage
 void handleRoot() {
-  String html = "<!DOCTYPE html><html><head><title>ESP32 Control</title></head><body>";
+  String html =
+      "<!DOCTYPE html><html><head><title>ESP32 Control</title></head><body>";
   html += "<h2>ESP32 Notification & Clock</h2>";
 
   // Clock controls
@@ -74,9 +91,7 @@ void handleRoot() {
   server.send(200, "text/html", html);
 }
 
-void handleClock() {
-  server.send(200, "text/plain", "Clock mode activated");
-}
+void handleClock() { server.send(200, "text/plain", "Clock mode activated"); }
 
 unsigned long stopwatchStart = 0;
 bool stopwatchRunning = false;
@@ -84,6 +99,7 @@ bool stopwatchRunning = false;
 void handleStopwatchStart() {
   stopwatchStart = millis();
   stopwatchRunning = true;
+  mode = STOPWATCH;
   server.send(200, "text/plain", "Stopwatch started!");
 }
 
@@ -95,19 +111,22 @@ void handleStopwatchStop() {
 void handleStopwatchReset() {
   stopwatchStart = millis();
   stopwatchRunning = false;
+  mode = CLOCK;
   server.send(200, "text/plain", "Stopwatch reset!");
 }
 
 unsigned long timerDuration = 0;
-unsigned long timerStart = 0;
+unsigned long timeStart = 0;
 bool timerRunning = false;
 
 void handleTimerStart() {
   if (server.hasArg("sec")) {
     timerDuration = server.arg("sec").toInt();
-    timerStart = millis();
+    timeStart = millis();
     timerRunning = true;
-    server.send(200, "text/plain", "Timer started for " + String(timerDuration) + " sec");
+    mode = TIMER;
+    server.send(200, "text/plain",
+                "Timer started for " + String(timerDuration) + " sec");
   } else {
     server.send(400, "text/plain", "Missing ?sec parameter");
   }
@@ -118,47 +137,76 @@ void handleTimerStop() {
   server.send(200, "text/plain", "Timer stopped");
 }
 
-
-void drawNum(int num, int start_x,int start_y,CRGB color){
-  if (num > 9 || num < 0)
-  {
+// Rendering font by using the stored bitmap
+void drawNum(int num, int start_x, int start_y, CRGB color) {
+  if (num > 9 || num < 0) {
     Serial.println("ERROR:Number Out of Bounds");
     return;
   }
-  const byte* font_data = font_bitmaps[num];
-
-  for (int char_y = 0 ; char_y < FONT_HEIGHT;char_y++){
-    for (int char_x = 0 ; char_x < FONT_WIDTH;char_x++){
+  const byte *font_data = font_bitmaps[num];
+  for (int char_y = 0; char_y < FONT_HEIGHT; char_y++) {
+    for (int char_x = 0; char_x < FONT_WIDTH; char_x++) {
       int grid_x = start_x + char_x;
       int grid_y = start_y + char_y;
-      if (font_data[char_y*FONT_WIDTH+char_x]){
-	if (grid_x >= 0&& grid_x<IMAGE_WIDTH&&grid_y >= 0 && grid_y<IMAGE_HEIGHT){
-	  leds[XY2Index(grid_x, grid_y)] = color;
-	}
+      if (font_data[char_y * FONT_WIDTH + char_x]) {
+        if (grid_x >= 0 && grid_x < IMAGE_WIDTH && grid_y >= 0 &&
+            grid_y < IMAGE_HEIGHT) {
+          leds[XY2Index(grid_x, grid_y)] = color;
+        }
       }
     }
   }
-
 }
 
-void displayTime(int hour,int minute,CRGB hourColor,CRGB minuteColor){
+void displayTime(int hour, int minute, CRGB hourColor, CRGB minuteColor) {
   if (minute >= 60 || hour >= 24) {
     Serial.println("ERROR:Time Out OF Bound");
     return;
   }
-  int h_0 = hour%10;
-  int h_1 = hour/10;
-  int m_0 = minute%10;
-  int m_1 = minute/10;
+  int h_0 = hour % 10;
+  int h_1 = hour / 10;
+  int m_0 = minute % 10;
+  int m_1 = minute / 10;
 
   drawNum(h_1, 0, 1, hourColor);
   drawNum(h_0, 4, 1, hourColor);
   drawNum(m_1, 9, 1, minuteColor);
-  drawNum(m_0, 13, 1, minuteColor); 
-
-
+  drawNum(m_0, 13, 1, minuteColor);
 }
 
+
+// For displaying the stopwatch dial
+void displayStopWatch() {
+  unsigned long diff = (millis() - stopwatchStart) / 1000;
+  if (!stopwatchRunning)
+    diff = diff;
+  int minutes = (diff / 60) % 60;
+  int seconds = diff % 60;
+  displayTime(minutes, seconds, CRGB::Red, CRGB::Yellow);
+}
+
+
+// For displaying the timer dial
+void displayTimer() {
+  unsigned long diff = (millis() - timeStart) / 1000;
+  long remaining;
+  if (timerRunning) {
+    if (diff >= timerDuration) {
+      timerRunning = false;
+      remaining = 0;
+      showNotification("done", leds); // show done notification
+    } else {
+      remaining = timerDuration - diff;
+    }
+  } else {
+    remaining = timerDuration - diff; // keep last value if stopped
+    if (remaining < 0)
+      remaining = 0;
+  }
+  int minutes = (remaining / 60) % 60;
+  int seconds = remaining % 60;
+  displayTime(minutes, seconds, CRGB::White, CRGB::Orange);
+}
 
 void setup() {
   Serial.begin(9600);
@@ -174,40 +222,61 @@ void setup() {
   Serial.println("\nWiFi connected!");
   Serial.print("IP Address: ");
   Serial.println(WiFi.localIP());
-  server.on("/",handleRoot);
-  server.on("/notify",handleNotify);
-  
-server.on("/clock", handleClock);
 
-server.on("/stopwatch/start", handleStopwatchStart);
-server.on("/stopwatch/stop", handleStopwatchStop);
-server.on("/stopwatch/reset", handleStopwatchReset);
+  // Server handlers setting up
+  server.on("/", handleRoot);
+  server.on("/notify", handleNotify);
+  server.on("/clock", handleClock);
+  server.on("/stopwatch/start", handleStopwatchStart);
+  server.on("/stopwatch/stop", handleStopwatchStop);
+  server.on("/stopwatch/reset", handleStopwatchReset);
+  server.on("/timer/start", handleTimerStart);
+  server.on("/timer/stop", handleTimerStop);
 
-server.on("/timer/start", handleTimerStart);
-server.on("/timer/stop", handleTimerStop);
   server.begin();
   Serial.println("\nWeb Server Started! \n");
 }
-
-int iter = 0;
-
 void loop() {
- 
-  if (millis() - lastTimeSync > 3600000) {  
+
+  if (millis() - lastTimeSync > 3600000) {
     setupTime();
   }
-  
   if (!getLocalTime(&timeinfo)) {
     timeValid = false;
   } else {
     timeValid = true;
   }
-  
-  struct tm time = getTime();
   server.handleClient();
-  displayTime(time.tm_hour,time.tm_min,CRGB::Blue, CRGB::Green);
+  switch (mode) {
+  case CLOCK: {
+    struct tm time = getTime();
+    displayTime(time.tm_hour, time.tm_min, CRGB::Yellow, CRGB::Purple);
+    break;
+  }
+  case STOPWATCH: {
+    if (stopwatchRunning)
+      displayStopWatch();
+    else {
+      displayStopWatch();
+      FastLED.show();
+      delay(stopWatchResistanceTime);
+      FastLED.clear();
+      mode = CLOCK;
+    }
+    break;
+  }
+  case TIMER: {
+    if (timerRunning)
+      displayTimer();
+    else {
+      displayTimer();
+      mode = CLOCK;
+      FastLED.show();
+      delay(timerResistanceTime);
+    }
+  }
+  }
   FastLED.show();
   delay(500);
   FastLED.clear();
 }
-
