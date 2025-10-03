@@ -2,12 +2,8 @@
 #include <avr/Arduino.h>
 #include <avr/HardwareSerial.h>
 
-
 unsigned long prev = 0;
 unsigned long elapsed = 0;
-
-
-
 
 void setTime() {
   Serial.println("enter time hh:mm:ss format:");
