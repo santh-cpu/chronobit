@@ -5,15 +5,15 @@ Choronobit aims to be not just a digital clock, but helps the user stay focused 
 ## How to execute 
 1) Install platform io cli
 2) To compile
-	```
+	```bash
 	pio run
 	```
 3) To upload the code into the device
-	```
+	```bash
 	pio run --target upload
 	```
 4) To access the serial monitor
-	```
+	```bash
 	pio run --target monitor
 	```
 
